@@ -1,0 +1,11 @@
+name: azf_api_py310
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - numpy=1.26.*
+  - pandas=2.2.*
+  - pip:
+      - azure-functions
+      - azure-storage-blob

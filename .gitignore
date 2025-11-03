@@ -1,15 +1,16 @@
 # Angular specific
-/dist/
+**/dist/
+**/build/
 /out-tsc/
 /tmp/
 /coverage/
 /e2e/test-output/
 /.angular/
 .angular/
-
+.vscode/
 # Node modules and dependency files
-/node_modules/
-/package-lock.json
+**/node_modules/
+**/package-lock.json
 /yarn.lock
 
 # Environment files

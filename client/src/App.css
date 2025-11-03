@@ -1,0 +1,769 @@
+/* =========================================================================
+ * App Layout and Theme Styles
+ *
+ * This stylesheet defines the overall look and feel for the watershed
+ * dashboard. It is organised top‑down so that global variables and resets
+ * appear first, followed by layout containers, navigation/header styles,
+ * filter controls, plots/maps, search multi‑select overrides, responsive
+ * tweaks and finally state variations such as disabled buttons.
+ *
+ * The file uses CSS custom properties (variables) to centralise the colour
+ * palette, typographic scale and radii. Adjusting these variables will
+ * propagate consistent changes throughout the UI.
+ * ========================================================================= */
+
+/* ======= Theme variables ======= */
+@import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;600;700&family=Lato:wght@300;400;700&display=swap');
+
+:root {
+  /* Colour palette */
+  --color-primary: #1f2937;      /* primary brand colour: dark blue/graphite */
+  --color-secondary: #37474f;    /* secondary text colour: charcoal slate */
+  --color-accent: #c94c4c;       /* warm accent colour: muted brick red */
+  --color-bg: #f8fafc;           /* page background: very light blue/grey */
+  --color-panel-bg: #ffffff;     /* card backgrounds: white */
+  --color-border: #e5e7eb;       /* neutral border lines: light grey */
+  
+  /* new */
+  --font-scale: 1.125; /* 1 = 100% baseline */
+
+  /* update these to use the scale */
+  --font-size-base:  calc(14px * var(--font-scale));
+  --font-size-label: calc(14px * var(--font-scale));
+  --font-size-title: calc(24px * var(--font-scale));
+
+  /* Sizing */
+  --radius: 10px;                /* default border radius used on cards and inputs */
+}
+
+/* ======= Global resets ======= */
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Lato", system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu,
+               "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  background-color: var(--color-bg);
+  color: var(--color-secondary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Serif headings use the complementary Lora font for contrast */
+h1, h2, h3, h4,
+.plot-panel h4 {
+  font-family: "Lora", Georgia, "Times New Roman", serif;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+/* =========================================================================
+ * Layout Containers
+ *
+ * The following classes control the overall page layout using CSS grid.
+ * The .app wrapper defines the header row and main content area. The
+ * .main area splits into a left column for the filter/map and a right
+ * column for plots. On narrow screens, the columns stack vertically.
+ * ========================================================================= */
+
+/* Grid wrapper holding the header (auto height) and main content (fills remainder) */
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+}
+
+/* Main content uses two columns on large screens and stacks on mobile */
+.main {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  align-items: stretch;
+  gap: 16px;
+  margin: 16px;
+  height: calc(100% - 32px);
+  min-height: 0;
+}
+
+@media (max-width: 900px) {
+  .main {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Left column holds the filter panel and map */
+.left {
+  min-height: 0;
+  min-width: 980px;
+  justify-self: start;
+}
+
+/* Right column hosts plots and grows to fill available space */
+.right {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Inside the left column, stack the filters toolbar above the map */
+.filter-map-panel {
+  display: grid;
+  grid-template-rows: max-content 1fr;
+  gap: 16px;
+  width: min(100%, var(--panel-max-width));
+  height: 100%;
+  min-height: 0;
+}
+
+/* =========================================================================
+ * Header Navigation
+ *
+ * The header provides branding and navigation. It is styled with the
+ * primary brand colour and white text for contrast. The header container
+ * aligns the logo, title and optional menu on one line.
+ * ========================================================================= */
+
+/* Header bar with dark background and subtle shadow */
+.header {
+  background-color: var(--color-primary);
+  color: #fff;
+  min-width: 200px;
+  line-height: 1.2;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  position: relative;
+  z-index: 10;
+}
+
+/* Flex container to align header contents horizontally */
+.header-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 12px 20px;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+/* Left section contains logo and title */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Site logo scales nicely within the header */
+.header-logo {
+  display: block;
+  height: 44px;
+  width: auto;
+  max-width: 200px;
+  padding-right: 20px;
+  object-fit: contain;
+}
+
+/* Main title uses Lato for clarity and clamps size responsively */
+.title {
+  font-family: "Lato", system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  font-size: calc(clamp(20px, 2.4vw, 30px) * var(--font-scale));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #fff;
+}
+
+/* Allow the title to wrap on very narrow screens */
+@media (max-width: 520px) {
+  .title {
+    white-space: normal;
+  }
+}
+
+/* Optional vertical divider between title and menu */
+.vertical-separator {
+  width: 1px;
+  height: 1.4em;
+  background: rgba(255, 255, 255, 0.25);
+  margin: 0 10px;
+}
+
+/* Navigation menu next to the title */
+.menu {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.menu a,
+.menu-link,
+.menu-button {
+  font-size: 16px;
+  font-weight: 400;
+  color: #fff;
+  text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.menu a:hover {
+  text-decoration: underline;
+}
+
+/* =========================================================================
+ * Filter Toolbar
+ *
+ * The filters toolbar groups inputs for site selection, year range,
+ * parameter selection and actions. It scrolls horizontally when there
+ * isn't enough space and floats above the map on the left side.
+ * ========================================================================= */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 16px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--color-panel-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px;
+  box-sizing: border-box;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  flex: 0 0 auto;
+}
+
+.filters > * {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Generic group wrapper used for dropdowns */
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+}
+
+/* Site multi‑select has a defined width on large screens but collapses responsively */
+.site-group {
+  width: 260px;
+  max-width: 100%;
+}
+
+/* Filter dropdown including its label */
+.filter-dropdown {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.filter-dropdown label,
+.sms-label {
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  color: var(--color-secondary);
+  margin-bottom: 4px;
+}
+
+/* Native select styling (year and parameter selects) */
+.year-select,
+.sms-toggle {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: #fff;
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  color: var(--color-secondary);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.year-select:focus {
+  border-color: var(--color-secondary);
+  outline: none;
+  box-shadow: none;
+}
+
+/* Search box for site filtering */
+.search-box,
+.sms-search {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  box-sizing: border-box;
+  outline: none;
+}
+
+/* Site list container and items */
+.site-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  padding: 5px;
+  background: #fff;
+}
+
+.site-item {
+  padding: 8px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+}
+
+.site-item:last-child {
+  border-bottom: none;
+}
+
+.site-item:hover {
+  background: #e0e6ed;
+}
+
+.site-item.selected {
+  background: var(--color-secondary);
+  color: #fff;
+  font-weight: bold;
+}
+
+/* Parameter filter layout and options */
+.parameter-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.parameter-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-top: 5px;
+}
+
+.parameter-option {
+  display: flex;
+  align-items: center;
+}
+
+.parameter-option input {
+  margin-right: 5px;
+}
+
+/* Filter action buttons align to the end of the toolbar */
+.filter-buttons {
+  display: flex;
+  flex-direction: column;   /* <— was row; now column */
+  gap: 8px;                 /* space between the two buttons */
+  align-self: flex-start;   /* keep the block compact instead of stretching */
+  margin-top: 0;            /* tighter since they are their own column */
+  min-width: 160px;         /* keeps a tidy, narrow column; tweak as desired */
+}
+
+.reset-btn {
+  padding: 5px 9px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  cursor: pointer;
+  background-color: var(--color-accent);
+  color: #fff;
+  width: 100%;
+  text-align: center;
+  transition: background-color 0.15s ease;
+}
+
+.reset-btn:hover {
+  background-color: #b04040;
+}
+
+/* =========================================================================
+ * Map and Plot Panels
+ *
+ * These panels share a common card style: white background, neutral
+ * border, padding, radius and a soft shadow. They are flex containers
+ * oriented vertically to house their respective content.
+ * ========================================================================= */
+
+.map,
+.plots,
+.plot-panel {
+  background: var(--color-panel-bg);
+  border: 1px solid var(--color-border);
+  padding: 12px;
+  border-radius: var(--radius);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+}
+
+.map,
+.plot-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Layout container for up to two plots stacked vertically */
+.plots-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+}
+
+.plot-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Chart header within a plot panel */
+.plot-panel h4 {
+  margin-bottom: 12px;
+  flex-shrink: 0;
+  font-family: "Poppins", sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-secondary);
+}
+
+/* Icon styling within plot headers */
+.plot-icons svg {
+  color: var(--color-secondary);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.plot-icons svg:hover {
+  color: var(--color-accent);
+}
+
+/* Chart area fills the panel */
+.plot-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.plot-content canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Subtitles and notices displayed above charts */
+.plot-subtitle,
+.plot-notice {
+  font-size: 13px;
+  color: var(--color-secondary);
+  margin-top: 2px;
+}
+
+.plot-notice {
+  background-color: #fef7f0;
+  border: 1px solid #fde9da;
+  border-radius: 6px;
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* =========================================================================
+ * Searchable Multi‑Select Overrides
+ *
+ * The SearchableMultiSelect component comes from a third‑party library.
+ * These overrides adjust sizing, spacing and the caret icon so it aligns
+ * visually with native selects used in the filter panel.
+ * ========================================================================= */
+
+.sms-root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 360px;
+  --sms-radius: 12px;
+}
+
+/* Toggle (the collapsed control shown before opening the list) */
+.sms-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sms-toggle.open {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
+  box-shadow: none;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.sms-summary {
+  color: var(--color-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sms-summary.has-value {
+  color: var(--color-secondary);
+}
+
+/* Custom chevron caret using borders */
+.sms-caret {
+  margin-left: 8px;
+  width: 0.5em;
+  height: 0.5em;
+  border-right: 2px solid var(--color-secondary);
+  border-bottom: 2px solid var(--color-secondary);
+  transform: rotate(45deg);
+  display: inline-block;
+  box-sizing: border-box;
+}
+
+.sms-caret > svg {
+  display: none; /* hide default SVG icon */
+}
+
+/* Dropdown panel containing controls and list */
+.sms-panel,
+.sms-panel-overlay {
+  margin-top: 0 !important;
+  border: 1px solid var(--color-border);
+  border-radius: var(--sms-radius);
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(2, 6, 23, 0.12);
+  overflow: hidden;
+  display: flex;
+  width: 250px;
+  flex-direction: column;
+}
+
+.sms-controls {
+  padding: 8px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  gap: 8px;
+  flex-direction: column;
+  width: 95%;
+}
+
+.sms-actions {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.sms-action {
+  border: none;
+  background: #f1f5f9;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.sms-action:hover {
+  background: #e2e8f0;
+}
+
+.sms-list {
+  overflow: auto;
+  max-height: 240px;
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+}
+
+.sms-empty {
+  padding: 12px;
+  color: #64748b;
+  text-align: center;
+}
+
+.sms-option {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.sms-option.hover {
+  background: #f8fafc;
+}
+
+.sms-option.active {
+  background: #eef2ff;
+}
+
+.sms-option input {
+  pointer-events: none;
+}
+
+.sms-option-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Overlay variant used when dropdown appears in a portal */
+.sms-panel-overlay {
+  border-top-left-radius: var(--sms-radius) !important;
+  border-top-right-radius: var(--sms-radius) !important;
+  box-shadow: 0 12px 28px rgba(2, 6, 23, 0.18), 0 2px 8px rgba(2, 6, 23, 0.08);
+  overflow: hidden;
+}
+
+/* Prevent parent containers from clipping overlay dropdowns */
+.filters,
+.container {
+  overflow: visible;
+}
+
+/* =========================================================================
+ * Utility & State classes
+ *
+ * Common utility classes used across the application for spacing and error
+ * messages. Also includes disabled state styling for buttons.
+ * ========================================================================= */
+
+.filter-separator {
+  border: none;
+  border-top: 1px solid #ccc;
+  margin: 10px 0;
+}
+
+.error {
+  color: #d32f2f;
+  margin-top: 10px;
+  font-weight: 500;
+}
+
+/* Disabled reset buttons are visibly faded and not interactive */
+.reset-btn:disabled,
+.reset-btn[disabled] {
+  background-color: #e5e7eb;
+  color: #9ca3af;
+  border: 1px solid #d1d5db;
+  box-shadow: none;
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.reset-btn:disabled:hover,
+.reset-btn[disabled]:hover,
+.reset-btn:disabled:active,
+.reset-btn[disabled]:active,
+.reset-btn:disabled:focus,
+.reset-btn[disabled]:focus {
+  background-color: #e5e7eb;
+  color: #9ca3af;
+  box-shadow: none;
+  outline: none;
+}
+
+/* Faded icons within disabled buttons */
+.reset-btn:disabled svg,
+.reset-btn[disabled] svg {
+  opacity: 0.55;
+}
+
+/* Make the Leaflet map fill its parent card */
+.map .leaflet-container {
+  height: 100%;
+  width: 100%;
+}
+
+/* Root sets the base for label + toggle (panel inherits too) */
+.sms-root {
+  font-size: var(--font-size-base);
+}
+
+/* Ensure the portalled panel and everything inside scales uniformly */
+.sms-panel,
+.sms-panel-overlay {
+  font-size: var(--font-size-base);
+}
+
+/* Search box */
+.sms-search {
+  font-size: var(--font-size-base);
+}
+
+/* The text in the closed control should inherit the same size */
+.sms-summary {
+  font-size: inherit;
+}
+
+/* Quick action pills (All / Clear / All Lakes / All Streams) */
+.sms-action {
+  font-size: var(--font-size-base);
+}
+
+/* List rows and labels */
+.sms-option,
+.sms-option-label {
+  font-size: var(--font-size-base);
+}
+
+/* Empty state message */
+.sms-empty {
+  font-size: var(--font-size-base);
+}
+
+/* The dropdown list area */
+.sms-panel .sms-list {
+  overflow-y: auto;
+  overflow-x: hidden !important;        /* never show horizontal bar */
+  scrollbar-width: thin;                /* Firefox: thin vertical bar only */
+}
+
+/* WebKit: remove horizontal scrollbar track entirely */
+.sms-panel .sms-list::-webkit-scrollbar:horizontal { height: 0 !important; }
+
+/* Keep rows from expanding the width */
+.sms-panel .sms-option {
+  display: grid;
+  grid-template-columns: 18px 1fr;      /* checkbox | label */
+  align-items: center;
+  column-gap: 8px;
+  min-width: 0;                         /* allow shrink */
+}
+
+/* Wrap long names so they don't force horizontal scroll */
+.sms-panel .sms-option-label {
+  min-width: 0;
+  white-space: normal;                  /* wrap text */
+  word-break: break-word;               /* break very long tokens */
+}
+
+/* (Optional) also hide horizontal overflow in the whole overlay just in case */
+.sms-panel { overflow-x: hidden; }

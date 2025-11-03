@@ -1,0 +1,113 @@
+{
+  "info": {
+    "name": "Azure Functions (Local) — hello + read_csv",
+    "_postman_id": "f0a6b2d2-9e1a-44b3-8b3a-6d7c2a9b0b11",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Local tests for function_app.py endpoints: /api/hello and /api/read-csv"
+  },
+  "item": [
+    {
+      "name": "hello — positive (GET with name)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/hello?name={{name}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Body says Hello\", function () { pm.expect(pm.response.text()).to.include(\"Hello\"); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "hello — negative (no name -> 400)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/hello"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 400\", function () { pm.response.to.have.status(400); });",
+              "pm.test(\"Body asks for name\", function () { pm.expect(pm.response.text()).to.include(\"Please pass a 'name'\"); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "read_csv — positive (JSON)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/read-csv?container={{container}}&blob={{blob}}&format=json"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });",
+              "const ct = pm.response.headers.get('Content-Type') || '';",
+              "pm.test(\"Content-Type is JSON\", function () { pm.expect(ct.toLowerCase()).to.include('application/json'); });",
+              "let data;",
+              "pm.test(\"Response is valid JSON\", function(){",
+              "  data = pm.response.json();",
+              "  pm.expect(data).to.be.an('array');",
+              "});",
+              "pm.test(\"Array has at least one row\", function(){",
+              "  pm.expect(data.length).to.be.at.least(1);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "read_csv — negative (invalid container/blob -> 4xx/5xx)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/read-csv?container=this_container_should_not_exist_12345&blob=nope.csv&format=json"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is >= 400\", function () { pm.expect(pm.response.code).to.be.at.least(400); });",
+              "const ct = pm.response.headers.get('Content-Type') || '';",
+              "pm.test(\"Content-Type is JSON-ish\", function () { pm.expect(ct.toLowerCase()).to.include('application/json'); });",
+              "let body = {};",
+              "try { body = pm.response.json(); } catch(e) { body = {}; }",
+              "pm.test(\"Error field present\", function(){ pm.expect(body).to.have.property('error'); });"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:7071" },
+    { "key": "name", "value": "Rudy" },
+    { "key": "container", "value": "nwmiws" },
+    { "key": "blob", "value": "NWMIWS_Site_Data_testing_varied.csv" }
+  ]
+}
