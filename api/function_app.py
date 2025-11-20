@@ -25,6 +25,16 @@ import azure.functions as func
 from azure.storage.blob import BlobServiceClient
 from azure.core.credentials import AzureSasCredential
 
+import logging
+import os
+from pathlib import Path
+from typing import Tuple
+
+import azure.functions as func
+from azure.storage.blob import BlobClient  # make sure this is in requirements.txt
+
+
+
 # Optional extras
 try:
     import pandas as pd
@@ -245,34 +255,62 @@ def hello(req: func.HttpRequest) -> func.HttpResponse:
     return func.HttpResponse(f"Hello, {name}!")
 
 @app.function_name(name="read_csv")
-@app.route(route="read-csv", methods=["GET", "POST", "OPTIONS"], auth_level=func.AuthLevel.ANONYMOUS)
+@app.route(route="read-csv", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def read_csv(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info("ENTER read_csv method=%s", req.method)
-    if req.method == "OPTIONS":
-        return func.HttpResponse(status_code=204, headers=_cors())
-    try:
-        p = _params(req)
-        if not p["container"] or not p["blob"]:
-            return func.HttpResponse(
-                json.dumps({"error": "Provide container & blob (query/body) or set BLOB_CONTAINER/BLOB_NAME"}),
-                status_code=400, mimetype="application/json", headers=_cors()
-            )
-        bsc = _bsc()
-        data = (
-            bsc.get_container_client(p["container"])
-               .get_blob_client(p["blob"])
-               .download_blob(max_concurrency=2)
-               .readall()
-        )
-        if p["format"] == "json":
-            rows = _csv_to_rows(data)
-            return func.HttpResponse(json.dumps(rows, default=str), status_code=200, mimetype="application/json", headers=_cors())
-        return func.HttpResponse(body=data, status_code=200, mimetype="text/csv",
-                                 headers={**_cors(), "Content-Disposition": f'inline; filename="{os.path.basename(p["blob"])}"'})
-    except Exception as e:
-        logging.exception("read_csv failed")
-        return func.HttpResponse(json.dumps({"error": str(e)}), status_code=500, mimetype="application/json", headers=_cors())
+    """
+    HTTP-triggered function.
+    Query/body parameters:
+      - filename: name of the CSV, e.g. "NWMIWS_Site_Data_testing_varied.csv"
+      - source: "local" or "cloud"
+    Returns JSON array of objects parsed from the CSV.
+    """
+    logging.info("read_csv function triggered")
 
+    filename, source = _get_params(req)
+
+    if not filename:
+        return func.HttpResponse(
+            "Missing 'filename' parameter", status_code=400
+        )
+
+    if source not in ("local", "cloud"):
+        return func.HttpResponse(
+            "Invalid 'source' parameter. Must be 'local' or 'cloud'.",
+            status_code=400,
+        )
+
+    try:
+        if source == "local":
+            csv_text = _read_local_csv(filename)
+        else:
+            csv_text = _read_cloud_csv(filename)
+
+        # Parse CSV text into list[dict]
+        csv_file = io.StringIO(csv_text)
+        reader = csv.DictReader(csv_file)
+        rows = list(reader)
+
+        json_body = json.dumps(rows, default=str)
+
+        return func.HttpResponse(
+            json_body,
+            status_code=200,
+            mimetype="application/json",
+        )
+
+    except FileNotFoundError as ex:
+        logging.error("File not found: %s", ex)
+        return func.HttpResponse(str(ex), status_code=404)
+
+    except ValueError as ex:
+        logging.error("Bad request: %s", ex)
+        return func.HttpResponse(str(ex), status_code=400)
+
+    except Exception as ex:
+        logging.exception("Unexpected error reading CSV")
+        return func.HttpResponse(
+            "Internal server error", status_code=500
+        )
 @app.function_name(name="log_event")
 @app.route(route="log-event", methods=["POST", "OPTIONS"], auth_level=func.AuthLevel.ANONYMOUS)
 def log_event(req: func.HttpRequest) -> func.HttpResponse:
@@ -312,3 +350,79 @@ def log_event(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse(json.dumps({"error": str(e)}), status_code=500, mimetype="application/json", headers=_cors())
 
     return func.HttpResponse(json.dumps({"status": "ok", "message": "Log data received and inserted."}), status_code=200, mimetype="application/json", headers=_cors())
+
+
+
+
+def _get_params(req: func.HttpRequest) -> Tuple[str, str]:
+    """
+    Helper to read filename and source from query string or JSON body.
+    source is 'local' or 'cloud'.
+    """
+    filename = req.params.get("filename")
+    source = req.params.get("source")
+
+    # Try JSON body if not present in query
+    if not filename or not source:
+        try:
+            body = req.get_json()
+        except ValueError:
+            body = {}
+
+        if not filename:
+            filename = body.get("filename")
+        if not source:
+            source = body.get("source")
+
+    # Defaults
+    if not source:
+        source = "cloud"  # or "local" if you prefer
+
+    return filename, source.lower()
+
+
+def _read_local_csv(filename: str) -> str:
+    """
+    Read CSV from the local filesystem under ./data.
+    Returns raw CSV text.
+    """
+    base_dir = Path(__file__).parent / "data"
+    base_dir = base_dir.resolve()
+
+    # Prevent path traversal: only allow files under base_dir
+    target = (base_dir / filename).resolve()
+    if not str(target).startswith(str(base_dir)):
+        raise ValueError("Invalid filename")
+
+    if not target.is_file():
+        raise FileNotFoundError(f"File not found: {target}")
+
+    logging.info("Reading local CSV: %s", target)
+    return target.read_text(encoding="utf-8")
+
+
+def _read_cloud_csv(filename: str) -> str:
+    """
+    Read CSV from Azure Blob Storage using account + SAS or connection string.
+    Returns raw CSV text.
+    """
+    account_name = os.getenv("STORAGE_ACCOUNT_NAME")
+    container_name = os.getenv("STORAGE_CONTAINER_NAME")
+    sas_token = os.getenv("STORAGE_ACCOUNT_SAS")  # if using SAS
+
+    if not account_name or not container_name or not sas_token:
+        raise RuntimeError("Missing storage configuration environment variables")
+
+    blob_url = (
+        f"https://{account_name}.blob.core.windows.net/"
+        f"{container_name}/{filename}?{sas_token}"
+    )
+
+    logging.info("Reading cloud CSV from %s", blob_url)
+
+    blob_client = BlobClient.from_blob_url(blob_url)
+    data = blob_client.download_blob().content_as_text(encoding="utf-8")
+
+    return data
+
+
